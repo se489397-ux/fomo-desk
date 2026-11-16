@@ -60,7 +60,13 @@
       const line = last ? (last.status.startsWith("skipped") ? `${esc(last.name || "")}: ${esc(last.status.slice(9))}` : `${esc(last.name || "")} · ${money(last.sizeUsd)}`) : "esperando señales";
       return `${head(k, "4 · Executor")}<div class="v">${ex.signals ?? 0} señales</div><div class="s">${line}<br>${ex.stackPct ?? 8}% stack · mín ${money(ex.minTicket)}</div>`;
     }
-    if (k === "risk") return `${head(k, "5 · Risk")}<div class="v">${c.open ? "Guarding" : "Sin posiciones"}</div><div class="s"><span class="why" style="font-size:12px">stop -${s.settings?.["risk.stop_pct"]}%</span> · <span class="okt" style="font-size:12px">trail ${s.settings?.["risk.trail_pct"]}%</span></div>`;
+    if (k === "risk") {
+      const rk = s.risk || {}, op = rk.open || [], last = (rk.closed || [])[0];
+      const v = op.length ? `Vigilando ${op.length}` : "Sin posiciones";
+      const line = op.length ? op.map((p) => `${esc(p.name || p.mint.slice(0, 6))} <span class="${(p.gainPct ?? 0) >= 0 ? "okt" : "why"}" style="font-size:12px">${p.gainPct == null ? "sin precio" : (p.gainPct >= 0 ? "+" : "") + p.gainPct.toFixed(1) + "%"}</span>${p.trailActive ? " · trail" : ""}`).slice(0, 2).join("<br>")
+        : last ? `última: ${esc(last.name || "")} <span class="${last.pnlUsd >= 0 ? "okt" : "why"}" style="font-size:12px">${money(last.pnlUsd)}</span>` : `<span class="why" style="font-size:12px">stop -${rk.stopPct ?? s.settings?.["risk.stop_pct"]}%</span> · <span class="okt" style="font-size:12px">trail ${rk.trailPct ?? s.settings?.["risk.trail_pct"]}%</span>`;
+      return `${head(k, "5 · Risk")}<div class="v">${v}</div><div class="s">${line}</div>`;
+    }
     return "";
   }
   const AGENTS = ["scanner", "auditor", "analyst", "executor", "risk"];
@@ -99,7 +105,20 @@
     const last = pts.length - 1;
     svg.innerHTML = (pts.length === 1 ? `<line x1="${P}" x2="${W - P}" y1="${y(vs[0])}" y2="${y(vs[0])}" stroke="${col}" stroke-width="2"/>` :
       `<path d="${d}" fill="none" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke"/>`) +
-      `<circle cx="${x(last)}" cy="${y(vs[last])}" r="3.5" fill="${col}"/>`;
+      `<circle cx="${x(last)}" cy="${y(vs[last])}" r="3.5" fill="${col}"/>` + marksSVG(pts, x, y);
+  }
+
+  // position marks: buy = cyan, sell = green, stop = red, placed at the balance point nearest in time
+  function marksSVG(pts, x, y) {
+    const ms = chart?.marks || [];
+    if (!ms.length || pts.length < 2) return "";
+    const ts = pts.map((p) => Date.parse(p.t));
+    return ms.map((m) => {
+      const t = Date.parse(m.t);
+      let i = 0; while (i < ts.length - 1 && ts[i + 1] <= t) i++;
+      const c = m.kind === "buy" ? "#64d2ff" : m.kind === "stop" ? "#ff453a" : "#00d35a";
+      return `<circle cx="${x(i).toFixed(1)}" cy="${y(pts[i].v).toFixed(1)}" r="4" fill="#000" stroke="${c}" stroke-width="2"><title>${esc(m.kind)} ${esc(m.name || "")}</title></circle>`;
+    }).join("");
   }
 
   // ---------------------------------------------------------------- Agents tab
@@ -112,7 +131,17 @@
     else if (agentSel === "auditor") { d.innerHTML = auditorDetail(); bindAuditor(); }
     else if (agentSel === "analyst") { d.innerHTML = analystDetail(); bindAnalyst(); }
     else if (agentSel === "executor") d.innerHTML = executorDetail();
-    else d.innerHTML = `<div class="detail-title">Risk</div><div class="detail-sub">Decide las salidas y te manda el botón Sell.</div><div class="list"><div class="empty">Sin posiciones abiertas.</div></div>`;
+    else d.innerHTML = riskDetail();
+  }
+
+  function riskDetail() {
+    const rk = state.risk || {}, op = rk.open || [], cl = rk.closed || [];
+    const pct = (x) => x == null ? "—" : (x >= 0 ? "+" : "") + x.toFixed(1) + "%";
+    const px = (p) => p == null ? "—" : p < 0.01 ? "$" + Number(p).toPrecision(4) : money(p);
+    const sub = `Stop -${rk.stopPct}% · trail ${rk.trailPct}% desde el pico al llegar a +${rk.trailStartPct}% · timeout ${rk.timeoutH} h si < +${rk.timeoutMinGainPct}%. PAPER: cierra solo al precio que dispara la salida.`;
+    const o = op.length ? op.map((p) => `<div class="row"><div>${esc(p.name || p.mint.slice(0, 6))}<div class="sub">entrada ${px(p.entryPrice)} · ahora ${px(p.lastPrice)} · stop ${px(p.stopPrice)}${p.trailActive ? " (trail)" : ""}</div></div><div class="${(p.gainPct ?? 0) >= 0 ? "okt" : "why"}">${pct(p.gainPct)}</div></div>`).join("") : `<div class="empty">Ninguna posición abierta</div>`;
+    const c = cl.length ? cl.map((p) => `<div class="row"><div>${esc(p.name || p.mint.slice(0, 6))}<div class="sub">${hhmm(p.closedAt)} · ${esc(p.reason)} · comisiones ${money(p.feesUsd)}</div></div><div class="${p.pnlUsd >= 0 ? "okt" : "why"}">${money(p.pnlUsd)}</div></div>`).join("") : `<div class="empty">Ninguna salida todavía</div>`;
+    return `<div class="detail-title">Risk</div><div class="detail-sub">${sub}</div><h3>Abiertas</h3><div class="list">${o}</div><h3>Salidas</h3><div class="list">${c}</div>`;
   }
 
   function executorDetail() {
