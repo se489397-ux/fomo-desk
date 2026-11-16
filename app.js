@@ -14,7 +14,7 @@
     }
     const v = localStorage.getItem(KEY);
     if (!v) return null;
-    if (/^https:\/\//.test(v)) return v.replace(/\/$/, "");
+    if (/^https:\/\//.test(v) || /^http:\/\/(127\.0\.0\.1|localhost)[:/]/.test(v)) return v.replace(/\/$/, "");
     if (/^[0-9a-f]{20,40}$/i.test(v)) return `https://gist.githubusercontent.com/${OWNER}/${v}/raw`;
     return null;
   }
@@ -52,7 +52,7 @@
     const card = (key, title, v, sub) => { const a = A[key]; return `<div class="card"><div class="h"><span>${title}</span><span><span class="dot ${a?.alive ? "ok" : ""}"></span>${a?.alive ? "vivo" : "caído"}</span></div><div class="v">${v}</div><div class="s">${sub}</div></div>`; };
     $("cards").innerHTML =
       card("scanner", "1 · Scanner", `${c.pools ?? 0} pools`, `${c.waiting ?? 0} en espera · ${c.scansPassed ?? 0} → auditor`) +
-      card("auditor", "2 · Auditor", `${c.audited ?? 0} taken apart`, `${c.auditRejected ?? 0} rejected`) +
+      auditorCard(s.auditor, A.auditor) +
       card("analyst", "3 · Analyst", "Scoring", `${c.scored ?? 0} puntuadas · ${s.analystMode === "rules" ? "reglas" : "Jev"}`) +
       card("executor", "4 · Executor", `${c.trades ?? 0} trades`, "esperando señales") +
       card("risk", "5 · Risk", c.open ? "Guarding" : "Sin posiciones", `stop -${s.settings?.["risk.stop_pct"]}% · trail ${s.settings?.["risk.trail_pct"]}%`) +
@@ -87,6 +87,40 @@
       `<circle cx="${x(last)}" cy="${y(vs[last])}" r="3.5" fill="${col}"/>`;
   }
 
+  // ---------------------------------------------------------------- Auditor
+  const LAYER_SHORT = ["Mint", "Freeze", "Dev", "Top 10", "LP", "Age", "Bundles", "Delegates"];
+  const cls = (p) => p === true ? "ok" : p === false ? "red" : "grey";
+  function auditorCard(au, hb) {
+    au = au || {}; const run = au.running, last = (au.recent || [])[0];
+    const layers = run ? run.layers : last ? last.layers : [];
+    const strips = Array.from({ length: 8 }, (_, i) => { const l = layers.find((x) => x.n === i + 1); return `<i class="${l ? cls(l.pass) : run && i === layers.length ? "beam" : "grey"}"></i>`; }).join("");
+    const line = run ? "taking apart..." : last ? (last.passed ? "8/8 → Executor" : esc(last.reason)) : "esperando monedas";
+    return `<div class="card"><div class="h"><span>2 · Auditor</span><span><span class="dot ${hb?.alive ? "ok" : ""}"></span>${hb?.alive ? "vivo" : "caído"}</span></div><div class="v">${au.takenApart ?? 0} taken apart</div><div class="strips">${strips}</div><div class="s">${line} · ${au.rejected ?? 0} rejected</div></div>`;
+  }
+  let auSel = null, auLastKey = null;
+  function renderAuditor() {
+    const au = state?.auditor || {}; const recent = au.recent || [];
+    $("au-n").textContent = au.takenApart ?? 0;
+    $("au-sub").textContent = au.layer8Down ? `capa 8 caída · ${au.layer8Kills} monedas en rojo` : `${au.rejected ?? 0} rejected`;
+    const a = au.running || recent.find((r) => r.mint === auSel) || recent[0];
+    if (!a) { $("au-coin").innerHTML = ""; $("au-stack").innerHTML = `<div class="empty">Esperando la primera moneda del Scanner</div>`; $("au-verdict").innerHTML = ""; }
+    else {
+      const key = a.mint + ":" + a.layers.map((l) => l.pass).join(",") + (au.running ? ":run" : "");
+      const animate = key !== auLastKey; auLastKey = key;
+      $("au-coin").innerHTML = `<div class="au-name">${esc(a.name || a.mint.slice(0, 6))} <span>${esc(a.symbol || "")}</span></div><a href="${esc(a.link)}" target="_blank" rel="noopener">FOMO</a>`;
+      const byN = Object.fromEntries(a.layers.map((l) => [l.n, l]));
+      const checked = a.layers.filter((l) => l.pass !== null).length;
+      $("au-stack").innerHTML = Array.from({ length: 8 }, (_, i) => {
+        const l = byN[i + 1]; const st = l ? cls(l.pass) : (au.running && i === checked ? "scan" : "grey");
+        const delay = animate && l && l.pass !== null ? `style="animation-delay:${i * 0.35}s"` : "";
+        return `<div class="disc ${st} ${animate && l && l.pass !== null ? "anim" : ""}" ${delay}><div class="ring"><span>${st === "ok" ? "✓" : st === "red" ? "✕" : i + 1}</span></div><div class="dl"><b>${i + 1} · ${esc(l?.name || LAYER_SHORT[i])}</b><em>${esc(l?.value || (au.running ? "…" : "not checked"))}</em></div><div class="beamline"></div></div>`;
+      }).join("");
+      $("au-verdict").innerHTML = au.running ? `<div class="pill run">taking apart...</div>` : a.passed ? `<div class="pill ok">8/8 → Executor</div>` : `<div class="pill red">${esc(a.reason)}</div><div class="sub2">Rejected · Skipped</div>`;
+    }
+    $("au-list").innerHTML = recent.length ? recent.map((r) => `<div class="row au-row" data-mint="${esc(r.mint)}"><div>${esc(r.name || r.mint.slice(0, 6))}<div class="sub">${hhmm(r.ts)} · ${r.layersChecked}/8</div></div><div class="${r.passed ? "okt" : "why"}">${r.passed ? "8/8" : esc(r.reason)}</div></div>`).join("") : `<div class="empty">Ninguna moneda auditada todavía</div>`;
+    document.querySelectorAll(".au-row").forEach((el) => el.onclick = () => { auSel = el.dataset.mint; auLastKey = null; renderAuditor(); });
+  }
+
   function renderActivity() {
     const rows = activity?.rows || [];
     $("activity").innerHTML = rows.length ? rows.map((r) => `<div class="row"><div>${esc(r.title)}<div class="sub">${hhmm(r.ts)} · ${esc(r.detail || "")}</div></div><div>${esc(r.amount || "")}</div></div>`).join("") : `<div class="empty">Sin actividad todavía</div>`;
@@ -114,15 +148,18 @@
       if (!state || !state.updatedAt || s.updatedAt >= state.updatedAt) { state = s; chart = c; activity = a; }
       lastOk = Date.now(); lastErr = null;
     } catch (err) { lastErr = err.message || String(err); }
-    renderHome(); renderChart(); renderActivity(); renderAccount(); renderErr();
+    renderHome(); renderChart(); renderAuditor(); renderActivity(); renderAccount(); renderErr();
   }
 
   document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => {
     document.querySelectorAll(".tabs button").forEach((x) => x.classList.toggle("on", x === b));
-    ["home", "activity", "account"].forEach((t) => ($("tab-" + t).hidden = t !== b.dataset.tab));
+    ["home", "auditor", "activity", "account"].forEach((t) => ($("tab-" + t).hidden = t !== b.dataset.tab));
+    document.body.classList.toggle("au-on", b.dataset.tab === "auditor");
   }));
 
   if (!base) { $("tab-home").hidden = true; $("setup").hidden = false; return; }
   tick(); setInterval(tick, POLL_MS);
+  const startTab = new URLSearchParams(location.search).get("tab");  // e.g. ?tab=auditor
+  if (startTab) document.querySelector(`.tabs button[data-tab="${CSS.escape(startTab)}"]`)?.click();
   document.addEventListener("visibilitychange", () => { if (!document.hidden) tick(); });
 })();
