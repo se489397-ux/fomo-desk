@@ -55,7 +55,11 @@
       const last = (an.recent || [])[0];
       return `${head(k, "3 · Analyst")}<div class="v">Scoring</div><div class="s rp">${an.scored ?? 0} puntuadas · ${an.passed ?? 0} → executor<br>${an.mode === "rules" ? "reglas" : "Jev"}</div>${ring(last?.score, an.minScore ?? 70)}`;
     }
-    if (k === "executor") return `${head(k, "4 · Executor")}<div class="v">${c.trades ?? 0} trades</div><div class="s">esperando señales</div>`;
+    if (k === "executor") {
+      const ex = s.executor || {}, last = (ex.recent || [])[0];
+      const line = last ? (last.status.startsWith("skipped") ? `${esc(last.name || "")}: ${esc(last.status.slice(9))}` : `${esc(last.name || "")} · ${money(last.sizeUsd)}`) : "esperando señales";
+      return `${head(k, "4 · Executor")}<div class="v">${ex.signals ?? 0} señales</div><div class="s">${line}<br>${ex.stackPct ?? 8}% stack · mín ${money(ex.minTicket)}</div>`;
+    }
     if (k === "risk") return `${head(k, "5 · Risk")}<div class="v">${c.open ? "Guarding" : "Sin posiciones"}</div><div class="s"><span class="why" style="font-size:12px">stop -${s.settings?.["risk.stop_pct"]}%</span> · <span class="okt" style="font-size:12px">trail ${s.settings?.["risk.trail_pct"]}%</span></div>`;
     return "";
   }
@@ -107,8 +111,18 @@
     if (agentSel === "scanner") d.innerHTML = scannerDetail();
     else if (agentSel === "auditor") { d.innerHTML = auditorDetail(); bindAuditor(); }
     else if (agentSel === "analyst") { d.innerHTML = analystDetail(); bindAnalyst(); }
-    else if (agentSel === "executor") d.innerHTML = `<div class="detail-title">Executor</div><div class="detail-sub">Calcula el tamaño y te manda 1 botón. Nunca compra solo.</div><div class="list"><div class="empty">Todavía sin lógica: recibe las monedas que pasan el Analyst y las registra.</div></div>`;
+    else if (agentSel === "executor") d.innerHTML = executorDetail();
     else d.innerHTML = `<div class="detail-title">Risk</div><div class="detail-sub">Decide las salidas y te manda el botón Sell.</div><div class="list"><div class="empty">Sin posiciones abiertas.</div></div>`;
+  }
+
+  function executorDetail() {
+    const ex = state.executor || {}, recent = ex.recent || [];
+    const sub = `Tamaño = mín(${ex.stackPct}% del stack, ${ex.maxPoolPct}% de la liquidez); por debajo de ${money(ex.minTicket)} → ${ex.belowMin === "bump" ? "sube al mínimo" : "salta"}. PAPER: rellena solo al precio de la señal. Nunca compra de verdad.`;
+    const list = recent.length ? recent.map((r) => {
+      const sk = r.status.startsWith("skipped");
+      return `<div class="row${sk ? " killed" : ""}"><div>${esc(r.name || r.mint.slice(0, 6))}<div class="sub">${hhmm(r.ts)} · ${sk ? esc(r.status.slice(9)) : `${money(r.sizeUsd)} · ${r.stackPct}% · ${esc(r.status)}`}</div></div><a href="${esc(r.link)}" target="_blank" rel="noopener">FOMO</a></div>`;
+    }).join("") : `<div class="empty">Ninguna señal todavía</div>`;
+    return `<div class="detail-title">Executor</div><div class="detail-sub">${ex.signals ?? 0} señales · ${ex.skipped ?? 0} saltadas · ${ex.ownerBought ?? 0} compradas por ti<br>${sub}</div><div class="list">${list}</div>`;
   }
 
   function scannerDetail() {
