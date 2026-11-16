@@ -102,7 +102,9 @@
   async function tick() {
     try {
       const [s, c, a] = await Promise.all([get("state.json"), get("chart.json"), get("activity.json")]);
-      state = s; chart = c; activity = a; lastOk = Date.now(); lastErr = null;
+      // raw gist replicas can briefly serve an older copy: never step backwards
+      if (!state || !state.updatedAt || s.updatedAt >= state.updatedAt) { state = s; chart = c; activity = a; }
+      lastOk = Date.now(); lastErr = null;
     } catch (err) { lastErr = err.message || String(err); }
     renderHome(); renderChart(); renderActivity(); renderAccount(); renderErr();
   }
