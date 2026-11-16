@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b0d12">
+<meta name="referrer" content="no-referrer">
+<title>fomo desk</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">fomo desk</div>
+  <span id="mode" class="badge">—</span>
+</header>
+<div id="errrow" class="errrow" hidden></div>
+
+<main>
+<section id="tab-home" class="tab">
+  <div class="balance">
+    <div class="label">Saldo <span id="startlbl"></span></div>
+    <div class="big"><span id="bal">—</span></div>
+    <div id="pnl" class="pnl">—</div>
+  </div>
+  <div class="chart"><svg id="chart" viewBox="0 0 340 120" preserveAspectRatio="none"></svg>
+    <div id="chartempty" class="empty" hidden>Sin datos todavía</div></div>
+  <div class="updated" id="updated">—</div>
+  <div class="cards" id="cards"></div>
+  <h3>Posiciones abiertas</h3>
+  <div id="positions" class="list"><div class="empty">Ninguna posición abierta</div></div>
+</section>
+
+<section id="tab-activity" class="tab" hidden>
+  <h3>Activity</h3>
+  <div id="activity" class="list"><div class="empty">Sin actividad todavía</div></div>
+</section>
+
+<section id="tab-account" class="tab" hidden>
+  <h3>Cuenta</h3>
+  <div class="kv" id="account"></div>
+  <p class="note">Plan B: la app se publica en GitHub Pages y los datos llegan con ~1-5 min de retraso.
+  Sin notificaciones web: los avisos te llegan al instante por Telegram. Los ajustes, la pausa y el
+  cambio de modo se hacen con comandos en Telegram; aquí solo se ven.</p>
+  <h3>Ajustes</h3>
+  <div class="kv" id="settings"></div>
+</section>
+
+<section id="setup" class="tab" hidden>
+  <h3>Falta el enlace de datos</h3>
+  <p class="note">Abre esta app una vez con el enlace completo que te dio tu bot (termina en <code>#d=…</code>).
+  Después se recuerda en este iPhone.</p>
+</section>
+</main>
+
+<nav class="tabs">
+  <button data-tab="home" class="on">Home</button>
+  <button data-tab="activity">Activity</button>
+  <button data-tab="account">Cuenta</button>
+</nav>
+<script src="app.js"></script>
+</body>
+</html>
