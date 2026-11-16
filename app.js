@@ -51,13 +51,21 @@
     const c = s.counts || {}, A = Object.fromEntries((s.agents || []).map((a) => [a.agent, a]));
     const card = (key, title, v, sub) => { const a = A[key]; return `<div class="card"><div class="h"><span>${title}</span><span><span class="dot ${a?.alive ? "ok" : ""}"></span>${a?.alive ? "vivo" : "caído"}</span></div><div class="v">${v}</div><div class="s">${sub}</div></div>`; };
     $("cards").innerHTML =
-      card("scanner", "1 · Scanner", `${c.pools ?? 0} pools`, `${c.scansPassed ?? 0} → auditor`) +
+      card("scanner", "1 · Scanner", `${c.pools ?? 0} pools`, `${c.waiting ?? 0} en espera · ${c.scansPassed ?? 0} → auditor`) +
       card("auditor", "2 · Auditor", `${c.audited ?? 0} taken apart`, `${c.auditRejected ?? 0} rejected`) +
       card("analyst", "3 · Analyst", "Scoring", `${c.scored ?? 0} puntuadas · ${s.analystMode === "rules" ? "reglas" : "Jev"}`) +
       card("executor", "4 · Executor", `${c.trades ?? 0} trades`, "esperando señales") +
       card("risk", "5 · Risk", c.open ? "Guarding" : "Sin posiciones", `stop -${s.settings?.["risk.stop_pct"]}% · trail ${s.settings?.["risk.trail_pct"]}%`) +
       `<div class="card"><div class="h"><span>FOMO</span></div><div class="v">@${esc(s.fomoHandle)}</div><div class="s">PAPER: no se toca dinero</div></div>`;
 
+    const k = (v) => v == null ? "—" : v >= 1e6 ? `$${(v / 1e6).toFixed(2)}M` : `$${(v / 1e3).toFixed(1)}K`;
+    const feed = s.scannerFeed || [];
+    $("feed").innerHTML = feed.length ? feed.slice(0, 15).map((r) => r.verdict === "pass"
+      ? `<div class="row"><div>${esc(r.name || r.mint.slice(0, 6))} · liq ${k(r.liquidityUsd)} · → auditor<div class="sub">${hhmm(r.ts)}</div></div><a href="${esc(r.link)}" target="_blank" rel="noopener">FOMO</a></div>`
+      : `<div class="row killed"><div><s>${esc(r.name || r.mint.slice(0, 6))}</s><div class="sub">${hhmm(r.ts)}</div></div><div class="why">${esc(r.reason)}</div></div>`).join("")
+      : `<div class="empty">Esperando graduaciones</div>`;
+    const w = $("warnrow"), ws = s.warnings || [];
+    w.hidden = !ws.length; w.textContent = ws.join(" · ");
     const pos = s.positions || [];
     $("positions").innerHTML = pos.length ? pos.map((x) => `<div class="row"><div>${esc(x.name || x.mint.slice(0, 6))}<div class="sub">${money(x.sizeUsd)} · ${esc(x.status)}</div></div><a href="${esc(x.link)}" target="_blank" rel="noopener">FOMO</a></div>`).join("") : `<div class="empty">Ninguna posición abierta</div>`;
   }

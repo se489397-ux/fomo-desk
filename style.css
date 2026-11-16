@@ -31,3 +31,5 @@ h3{margin:22px 0 8px;font-size:15px}
 .tabs{position:fixed;left:0;right:0;bottom:0;display:flex;background:rgba(11,13,18,.95);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
 .tabs button{flex:1;background:none;border:0;color:var(--mut);padding:14px 0;font:600 13px inherit}.tabs button.on{color:var(--fg)}
 a{color:var(--cyan)}
+.warnrow{margin:0 16px 8px;padding:10px 12px;border-radius:12px;background:rgba(245,158,11,.12);color:#fcd34d;font-size:13px}
+.row.killed{color:var(--mut)}.row.killed s{text-decoration-color:var(--red);text-decoration-thickness:2px}.row .why{color:var(--red);font-size:13px;text-align:right}
